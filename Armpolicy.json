@@ -10,6 +10,7 @@
                         "equals": "Microsoft.Storage/storageAccounts"
                     },
                     {
+                        
                         "not": {
                             "field": "Microsoft.Storage/storageAccounts/sku.name",
                             "in": [
