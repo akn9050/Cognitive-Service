@@ -1,2 +1,2 @@
 # Cognitive-Service
-Face API Cognitive Service
+Face API Cognitive-Service
