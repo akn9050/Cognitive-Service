@@ -1,0 +1,353 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminUsername": {
+      "defaultValue": "demouser",
+      "type": "string"
+    },
+    "adminPassword": {
+      "defaultValue": "demouser",
+      "type": "string"
+    },
+    "Visual_studio_VM_name": {
+      "defaultValue": "vs-vm",
+      "type": "string"
+    }
+  },
+  "variables": {
+    "VnetName": "vNet",
+    "NetworkInterface": "nic09",
+    "NetworkSecurityGroupName": "[concat('nsg', uniqueString(resourceGroup().id))]",
+    "publicIPAddressType": "Dynamic",
+    "storageaccount_name": "[concat('diagstrg', uniqueString(resourceGroup().id))]",
+    "publicIPAddressName": "myPublicIP",
+    "addressPrefix": "10.0.0.0/16",
+    "subnetName": "Subnet",
+    "subnetPrefix": "10.0.0.0/24"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.CognitiveServices/accounts",
+      "sku": {
+        "name": "S0"
+      },
+      "kind": "Face",
+      "name": "Faceapi",
+      "apiVersion": "2016-02-01-preview",
+      "tags": {
+        "displayName": "Faceapi"
+      },
+      "location": "[resourceGroup().location]",
+      "properties": {}
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('Visual_studio_VM_name')]",
+      "apiVersion": "2017-03-30",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "VirtualMachine"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "Standard_ds2_v2"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "MicrosoftVisualStudio",
+            "offer": "VisualStudio",
+            "sku": "VS-2017-Ent-WS2016",
+            "version": "latest"
+          },
+          "osDisk": {
+            "osType": "Windows",
+            "name": "[concat('vmOsDisk', uniqueString(resourceGroup().id))]",
+            "createOption": "FromImage",
+            "caching": "ReadWrite",
+            "managedDisk": {
+              "storageAccountType": "Premium_LRS"
+
+            },
+            "diskSizeGB": 128
+          },
+          "dataDisks": []
+        },
+        "osProfile": {
+          "computerName": "[parameters('Visual_studio_VM_name')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]",
+          "windowsConfiguration": {
+            "provisionVMAgent": true,
+            "enableAutomaticUpdates": true
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('NetworkInterface'))]"
+            }
+          ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,
+            "storageUri": "[concat('https://', variables('storageaccount_name'), '.blob.core.windows.net', '/')]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces', variables('NetworkInterface'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageaccount_name'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[variables('NetworkInterface')]",
+      "apiVersion": "2017-06-01",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "NetworkInterface"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAddress": "10.0.0.4",
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPAddressName'))]"
+              },
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('VnetName'), variables('subnetName'))]"
+              },
+              "primary": true,
+              "privateIPAddressVersion": "IPv4"
+            }
+          }
+        ],
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('NetworkSecurityGroupName'))]"
+        },
+        "primary": true,
+        "virtualMachine": {
+          "id": "[resourceId('Microsoft.Compute/virtualMachines', parameters('Visual_studio_VM_name'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPAddressName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('VnetName'))]",
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('NetworkSecurityGroupName'))]"
+      ]
+    },
+{
+    "type": "Microsoft.Storage/storageAccounts",
+    "sku": {
+        "name": "Standard_LRS",
+        "tier": "Standard"
+    },
+    "kind": "Storage",
+    "name": "[variables('storageaccount_name')]",
+    "apiVersion": "2017-06-01",
+    "location": "[resourceGroup().location]",
+    "tags": {},
+    "properties": {
+        "encryption": {
+            "keySource": "Microsoft.Storage",
+            "services": {
+                "blob": {
+                    "enabled": true
+                },
+                "file": {
+                    "enabled": true
+                }
+            }
+        },
+        "networkAcls": {
+            "bypass": "AzureServices",
+            "defaultAction": "Allow"
+        },
+        "supportsHttpsTrafficOnly": false
+    },
+    "dependsOn": []
+},
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[variables('NetworkSecurityGroupName')]",
+      "apiVersion": "2017-06-01",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "NetworkSecurityGroup"
+      },
+      "properties": {
+        "securityRules": [
+          {
+            "name": "default-allow-rdp",
+            "properties": {
+              "protocol": "TCP",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 1000,
+              "direction": "Inbound",
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          }
+        ],
+        "defaultSecurityRules": [
+          {
+            "name": "AllowVnetInBound",
+            "properties": {
+              "description": "Allow inbound traffic from all VMs in VNET",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "access": "Allow",
+              "priority": 65000,
+              "direction": "Inbound",
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          },
+          {
+            "name": "AllowAzureLoadBalancerInBound",
+            "properties": {
+              "description": "Allow inbound traffic from azure load balancer",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "AzureLoadBalancer",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 65001,
+              "direction": "Inbound",
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          },
+          {
+            "name": "DenyAllInBound",
+            "properties": {
+              "description": "Deny all inbound traffic",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 65500,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "AllowVnetOutBound",
+            "properties": {
+              "description": "Allow outbound traffic from all VMs to all VMs in VNET",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "access": "Allow",
+              "priority": 65000,
+              "direction": "Outbound"
+            }
+          },
+          {
+            "name": "AllowInternetOutBound",
+            "properties": {
+              "description": "Allow outbound traffic from all VMs to Internet",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "Internet",
+              "access": "Allow",
+              "priority": 65001,
+              "direction": "Outbound",
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          },
+          {
+            "name": "DenyAllOutBound",
+            "properties": {
+              "description": "Deny all outbound traffic",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 65500,
+              "direction": "Outbound",
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          }
+        ]
+      },
+      "dependsOn": []
+    },
+    {
+      "apiVersion": "2017-06-01",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('publicIPAddressName')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "PublicIPAddress"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "[variables('publicIPAddressType')]"
+      }
+    },
+    {
+      "apiVersion": "2016-03-30",
+      "type": "Microsoft.Network/virtualNetworks",
+      "name": "[variables('VnetName')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "VirtualNetwork"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('addressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('subnetName')]",
+            "properties": {
+              "addressPrefix": "[variables('subnetPrefix')]"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": {
+    "adminUserName": {
+      "value": "[parameters('adminUsername')]",
+      "type": "string"
+    },
+    "adminPassword": {
+      "value": "[parameters('adminPassword')]",
+      "type": "string"
+    },
+    "cognitivekey1": {
+        "type": "string",
+        "value": "[listKeys(concat(resourceGroup().id,'/providers/','Microsoft.CognitiveServices/accounts/', 'Faceapi'),'2016-02-01-preview').key1]"
+      },
+      "endpoint": {
+        "type": "string",
+        "value": "[reference(concat(resourceGroup().id,'/providers/','Microsoft.CognitiveServices/accounts/', 'Faceapi'),'2016-02-01-preview').endpoint]"
+      }
+  }
+}
