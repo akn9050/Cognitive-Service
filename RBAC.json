@@ -16,7 +16,6 @@
     "Microsoft.CognitiveServices/accounts/*"
   ],
   "NotActions": [
-
   ],
   "AssignableScopes": [
     "/subscriptions/809c90af-9f6b-40a7-a44d-dbd311ffd109/resourceGroups/testrg1"
